@@ -15,6 +15,7 @@ namespace yamlconv
         Boolean = 0xd0,
         Int = 0xd1,
         Single = 0xd2,
+        Double = 0xd3,
         UnamedNode = 0xc0,
         NamedNode = 0xc1,
         StringList = 0xc2,
@@ -213,6 +214,39 @@ namespace yamlconv
             }
         }
 
+        public class Double : ByamlNode
+        {
+            public int Value { get; set; }
+
+            public override ByamlNodeType Type
+            {
+                get { return ByamlNodeType.Double; }
+            }
+            public override bool CanBeAttribute
+            {
+                get { return true; }
+            }
+
+            public Double(EndianBinaryReader reader)
+            {
+                Address = reader.BaseStream.Position;
+
+                Value = reader.ReadInt32();
+
+                Length = reader.BaseStream.Position - Length;
+            }
+
+            public Double(int value)
+            {
+                Value = value;
+            }
+
+            public override void ToXml(XmlDocument yaml, XmlNode node, List<string> nodes, List<string> values, List<byte[]> data)
+            {
+                node.InnerText = Value.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
         public class UnamedNode : ByamlNode
         {
             public Collection<ByamlNode> Nodes { get; private set; }
@@ -256,6 +290,9 @@ namespace yamlconv
                             break;
                         case ByamlNodeType.Single:
                             Nodes.Add(new Single(reader));
+                            break;
+                        case ByamlNodeType.Double:
+                            Nodes.Add(new Double(reader));
                             break;
                         case ByamlNodeType.UnamedNode:
                             reader.BaseStream.Position = reader.ReadInt32();
@@ -320,6 +357,7 @@ namespace yamlconv
                     uint temp = reader.ReadUInt32();
                     int name = (int)(temp >> 8);
                     ByamlNodeType type = (ByamlNodeType)(byte)temp;
+                    //Console.WriteLine(i.ToString() + "(" + type.ToString() + "): " + temp.ToString());
 
                     switch (type)
                     {
@@ -337,6 +375,9 @@ namespace yamlconv
                             break;
                         case ByamlNodeType.Single:
                             Nodes.Add(new KeyValuePair<int, ByamlNode>(name, new Single(reader)));
+                            break;
+                        case ByamlNodeType.Double:
+                            Nodes.Add(new KeyValuePair<int, ByamlNode>(name, new Double(reader)));
                             break;
                         case ByamlNodeType.UnamedNode:
                             reader.BaseStream.Position = reader.ReadInt32();
@@ -377,7 +418,8 @@ namespace yamlconv
                     }
                     else
                     {
-                        XmlElement element = yaml.CreateElement(nodes[item.Key]);
+                        string key = nodes[item.Key].Replace("!", "_").Replace("<", "_-").Replace(">", "-_");
+                        XmlElement element = yaml.CreateElement(key);
                         item.Value.ToXml(yaml, element, nodes, values, data);
                         node.AppendChild(element);
                     }

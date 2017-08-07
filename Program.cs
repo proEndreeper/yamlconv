@@ -13,7 +13,7 @@ namespace yamlconv
             if (args.Length == 0)
             {
                 Console.WriteLine("yamlconv");
-                Console.WriteLine(" by Chadderz");
+                Console.WriteLine(" by Chadderz, modified by ProxEndreeper");
                 Console.WriteLine("");
                 Console.WriteLine("Converts byaml <-> xml");
                 Console.WriteLine("");
@@ -78,28 +78,52 @@ namespace yamlconv
         {
             if (reader.ReadUInt16() != 0x4259)
                 throw new InvalidDataException();
-            if (reader.ReadUInt16() != 0x0001)
+
+            uint version = reader.ReadUInt16();
+
+            Console.WriteLine("Version: " + version.ToString());
+            if (version != 0x0001 || version != 0x0002)
+            {
+                Console.WriteLine("Unsupported Version!");
                 throw new InvalidDataException();
+            }
 
             uint nodeOffset = reader.ReadUInt32();
+            Console.WriteLine("Node Offset: " + nodeOffset.ToString());
             if (nodeOffset > reader.BaseStream.Length)
+            {
+                Console.WriteLine("Invalid Node Offset!");
                 throw new InvalidDataException();
+            }
 
             // Number of offset values.
             // Splatoon byamls are missing dataOffset.
             uint offsetCount = nodeOffset == 0x10 ? 3u : 4u;
+            Console.WriteLine("Offset Count: " + offsetCount.ToString());
 
             uint valuesOffset = reader.ReadUInt32();
             if (valuesOffset > reader.BaseStream.Length)
+            {
+                Console.WriteLine("Invalid Values Offset!");
                 throw new InvalidDataException();
+            }
+            Console.WriteLine("Values Offset: " + valuesOffset.ToString());
 
             uint dataOffset = offsetCount > 3 ? reader.ReadUInt32() : 0;
             if (dataOffset > reader.BaseStream.Length)
+            {
+                Console.WriteLine("Invalid Data Offset!");
                 throw new InvalidDataException();
+            }
+            Console.WriteLine("Data Offset: " + dataOffset.ToString());
 
             uint treeOffset = reader.ReadUInt32();
             if (treeOffset > reader.BaseStream.Length)
+            {
+                Console.WriteLine("Invalid Tree Offset!");
                 throw new InvalidDataException();
+            }
+            Console.WriteLine("Tree Offset: " + treeOffset.ToString());
 
 
             List<string> nodes = new List<string>();
@@ -111,22 +135,28 @@ namespace yamlconv
                 reader.BaseStream.Seek(nodeOffset, SeekOrigin.Begin);
                 nodes.AddRange(new ByamlNode.StringList(reader).Strings);
             }
+            Console.WriteLine("String Nodes Retrieved");
             if (valuesOffset != 0)
             {
                 reader.BaseStream.Seek(valuesOffset, SeekOrigin.Begin);
                 values.AddRange(new ByamlNode.StringList(reader).Strings);
             }
+            Console.WriteLine("Value Nodes Retrieved");
             if (dataOffset != 0)
             {
                 reader.BaseStream.Seek(dataOffset, SeekOrigin.Begin);
                 data.AddRange(new ByamlNode.BinaryDataList(reader).DataList);
             }
+            Console.WriteLine("Data Nodes Retrieved");
 
             ByamlNode tree;
             ByamlNodeType rootType;
             reader.BaseStream.Seek(treeOffset, SeekOrigin.Begin);
             rootType = (ByamlNodeType)reader.ReadByte();
             reader.BaseStream.Seek(-1, SeekOrigin.Current);
+
+            Console.WriteLine("Root Type: "+rootType.ToString());
+
             if (rootType == ByamlNodeType.UnamedNode)
                 tree = new ByamlNode.UnamedNode(reader);
             else
@@ -146,6 +176,7 @@ namespace yamlconv
             root.Attributes.Append(offsetCountAttribute);
             yaml.AppendChild(root);
 
+            Console.WriteLine("Converting to XML!");
             tree.ToXml(yaml, root, nodes, values, data);
 
             using (StreamWriter writer = new StreamWriter(new FileStream(outpath, FileMode.Create), Encoding.UTF8))
@@ -236,7 +267,7 @@ namespace yamlconv
                     writer.BaseStream.Position = 0;
 
                     writer.Write((UInt16)0x4259);
-                    writer.Write((UInt16)0x0001);
+                    writer.Write((UInt16)0x0002);
                     writer.Write(off, 0, (int)offsetCount);
 
                     if (sorted_nodes.Count > 0)
